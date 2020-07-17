@@ -46,7 +46,8 @@ def update_score_to_google_spreadsheet(worksheet, score_data_frame):
     worksheet.update_cells(cell_list)
 
 
-worksheet = get_google_spread_sheet_workspace('https://docs.google.com/spreadsheets/d/1wxJdRDKc4HnsVlMxd41vnw2rb9AbVEkSHC3uomu6ISA')
+spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1wxJdRDKc4HnsVlMxd41vnw2rb9AbVEkSHC3uomu6ISA'
+worksheet = get_google_spread_sheet_workspace(spreadsheet_url)
 feedback_dataframe = get_feedback_dataframe(worksheet)
 print(feedback_dataframe)
 # update_score_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'score'])
