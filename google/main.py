@@ -23,15 +23,16 @@ def get_google_spread_sheet_workspace(spreadsheet_url):
     worksheet = doc.worksheet('설문지 응답 시트1')
     return worksheet
 
-def get_feedback_dataframe(worksheet):
+def get_feedback_dataframe(worksheet, feedback_col_title, email_col_title):
     data = worksheet.get_all_values()
     data_frame = pandas.DataFrame(data, columns=data[0])
     data_frame = data_frame.reindex(data_frame.index.drop(0))
 
     feedback_data_frame = pandas.DataFrame({
-            "feedback": data_frame.loc[:, '6. 게임의 유지할 점이나 아쉬웠던 점을 적어주세요.'],
-            "email": data_frame.loc[:, '* 자동 입력된 이메일 정보입니다.'],
-            "score": 0
+            "feedback": data_frame.loc[:, feedback_col_title],
+            "email": data_frame.loc[:, email_col_title],
+            "score": 0.0000,
+            "sentence_count": 0,
          })
 
     # feedbackDataFrame.at[1, 'score']
@@ -40,17 +41,19 @@ def get_feedback_dataframe(worksheet):
 # data_frame.loc[:, 'score']
 def update_score_to_google_spreadsheet(worksheet, score_data_frame):
     score_list = score_data_frame.to_list()
-    cell_list = worksheet.range('M2:M' + str(len(score_list) + 1))
+    update_column_to_google_spreadsheet('M2:M' + str(len(score_list) + 1), score_list)
+
+def update_sentence_count_to_google_spreadsheet(worksheet, sentence_count_data_frame):
+    score_list = sentence_count_data_frame.to_list()
+    update_column_to_google_spreadsheet('N2:N' + str(len(score_list) + 1), score_list)
+
+def update_column_to_google_spreadsheet(column_range, cell_value_list):
+    cell_list = worksheet.range(column_range)
     for (index, cell) in enumerate(cell_list):
-        cell.value = score_list[index]
+        cell.value = cell_value_list[index]
     worksheet.update_cells(cell_list)
 
 
-spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1wxJdRDKc4HnsVlMxd41vnw2rb9AbVEkSHC3uomu6ISA'
-worksheet = get_google_spread_sheet_workspace(spreadsheet_url)
-feedback_dataframe = get_feedback_dataframe(worksheet)
-print(feedback_dataframe)
-# update_score_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'score'])
 
 # 참고 : https://github.com/GoogleCloudPlatform/python-docs-samples/blob/master/language/sentiment/sentiment_analysis.py
 def analyze_sentiment(content):
@@ -120,6 +123,8 @@ def analyze_sentiment_context(feedback, is_verbose):
         print("Score : " + str(total_doc_score / len(doc_sentences)))
         print("Magnitude : " + str(total_doc_magnitude / len(doc_sentences)))
 
+    return score, magnitude, doc_sentences
+
 
 # 띄어쓰기 검사기 돌려랏
 # feedback = "무엇보다도 타격감이 엄청 좋은 거 같아요. 조작도 쉽고 하니까 누구나 재미있게 플레이를 할 수 있을 거 같아요. '태그액션' 이라는 장르가 사실 익숙한 장르가 아니다 보니까 조금은 이상했었는데 이렇게나 개성있는 게임을 플레이를 하니 정말 좋았습니다. RPG 게임이 정말 지루하다고 생각했습니다. 하지만 이렇게 스테이지 형식의 게임으로 플레이를 해보니 정말 재미있네요. 신박해서 정말 좋았습니다. 때리다보면 귀도 즐겁네요!"
@@ -131,3 +136,22 @@ def analyze_sentiment_context(feedback, is_verbose):
 # analyze_sentiment_context(feedback, False)
 # filename="./feedback"
 # load_workbook(filename, data_only=True)
+
+
+spreadsheet_url = 'https://docs.google.com/spreadsheets/d/1wxJdRDKc4HnsVlMxd41vnw2rb9AbVEkSHC3uomu6ISA'
+worksheet = get_google_spread_sheet_workspace(spreadsheet_url)
+feedback_dataframe = get_feedback_dataframe(worksheet,
+                                            feedback_col_title='6. 게임의 유지할 점이나 아쉬웠던 점을 적어주세요.',
+                                            email_col_title='* 자동 입력된 이메일 정보입니다.')
+print(feedback_dataframe)
+
+feedback_list = feedback_dataframe.loc[:, 'feedback'].to_list()
+for (index, feedback) in enumerate(feedback_list):
+    score, magnitude, doc_sentences = analyze_sentiment_context(feedback, is_verbose=False)
+    print(score)
+    feedback_dataframe.at[index + 1, 'score'] = score
+    feedback_dataframe.at[index + 1, 'sentence_count'] = len(doc_sentences)
+
+print(feedback_dataframe)
+update_score_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'score'])
+update_sentence_count_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'sentence_count'])
