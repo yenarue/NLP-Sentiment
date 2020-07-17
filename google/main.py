@@ -31,8 +31,13 @@ def get_feedback_dataframe(worksheet, feedback_col_title, email_col_title):
     feedback_data_frame = pandas.DataFrame({
             "feedback": data_frame.loc[:, feedback_col_title],
             "email": data_frame.loc[:, email_col_title],
-            "score": 0.0000,
+            "score": 0.0,
+            "magnitude": 0.0,
             "sentence_count": 0,
+            "feedback_length": 0,
+            "positive_list": "",
+            "neutral_list": "",
+            "negative_list": "",
          })
 
     # feedbackDataFrame.at[1, 'score']
@@ -40,14 +45,27 @@ def get_feedback_dataframe(worksheet, feedback_col_title, email_col_title):
 
 # data_frame.loc[:, 'score']
 def update_score_to_google_spreadsheet(worksheet, score_data_frame):
-    score_list = score_data_frame.to_list()
-    update_column_to_google_spreadsheet('M2:M' + str(len(score_list) + 1), score_list)
+    list = score_data_frame.to_list()
+    update_column_to_google_spreadsheet(worksheet, 'M2:M' + str(len(list) + 1), list)
+
+def update_magnitude_to_google_spreadsheet(worksheet,magnitude_data_frame):
+    list = magnitude_data_frame.to_list()
+    update_column_to_google_spreadsheet(worksheet, 'N2:N' + str(len(list) + 1), list)
 
 def update_sentence_count_to_google_spreadsheet(worksheet, sentence_count_data_frame):
-    score_list = sentence_count_data_frame.to_list()
-    update_column_to_google_spreadsheet('N2:N' + str(len(score_list) + 1), score_list)
+    list = sentence_count_data_frame.to_list()
+    update_column_to_google_spreadsheet(worksheet, 'O2:O' + str(len(list) + 1), list)
 
-def update_column_to_google_spreadsheet(column_range, cell_value_list):
+def update_feedback_length_to_google_spreadsheet(worksheet, data_frame):
+    list = data_frame.to_list()
+    update_column_to_google_spreadsheet(worksheet, 'P2:P' + str(len(list) + 1), list)
+
+def update_each_sentence_scores_to_google_spreadsheet(worksheet, positive_list, neutral_list, negative_list):
+    update_column_to_google_spreadsheet(worksheet, 'Q2:Q' + str(len(positive_list) + 1), positive_list.to_list())
+    update_column_to_google_spreadsheet(worksheet, 'R2:R' + str(len(neutral_list) + 1), neutral_list.to_list())
+    update_column_to_google_spreadsheet(worksheet, 'S2:S' + str(len(negative_list) + 1), negative_list.to_list())
+
+def update_column_to_google_spreadsheet(worksheet, column_range, cell_value_list):
     cell_list = worksheet.range(column_range)
     for (index, cell) in enumerate(cell_list):
         cell.value = cell_value_list[index]
@@ -147,11 +165,35 @@ print(feedback_dataframe)
 
 feedback_list = feedback_dataframe.loc[:, 'feedback'].to_list()
 for (index, feedback) in enumerate(feedback_list):
-    score, magnitude, doc_sentences = analyze_sentiment_context(feedback, is_verbose=False)
+    score, magnitude, doc_sentences = analyze_sentiment_context(feedback, is_verbose=True)
     print(score)
     feedback_dataframe.at[index + 1, 'score'] = score
+    feedback_dataframe.at[index + 1, 'magnitude'] = magnitude
     feedback_dataframe.at[index + 1, 'sentence_count'] = len(doc_sentences)
+    feedback_dataframe.at[index + 1, 'feedback_length'] = len(feedback)
+
+    negative_list = list(filter(lambda sen: sen.sentiment.score < 0, doc_sentences))
+    neutral_list = list(filter(lambda sen: sen.sentiment.score == 0, doc_sentences))
+    positive_list = list(filter(lambda sen: sen.sentiment.score > 0, doc_sentences))
+
+    negative_list = list(map(lambda neg: str(neg.text.content), negative_list))
+    neutral_list = list(map(lambda neg: str(neg.text.content), neutral_list))
+    positive_list = list(map(lambda neg: str(neg.text.content), positive_list))
+
+    feedback_dataframe.at[index + 1, 'negative_list'] = "\n".join(negative_list) if len(negative_list) > 0 else "-"
+    feedback_dataframe.at[index + 1, 'neutral_list'] = "\n".join(neutral_list) if len(neutral_list) > 0 else "-"
+    feedback_dataframe.at[index + 1, 'positive_list'] = "\n".join(positive_list) if len(positive_list) > 0 else "-"
+
+    break
 
 print(feedback_dataframe)
+
+# 흠.. 이렇게하고보니 row가 더 나았을 수 있었겠다^^...
 update_score_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'score'])
+update_magnitude_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'magnitude'])
 update_sentence_count_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'sentence_count'])
+update_feedback_length_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'feedback_length'])
+update_each_sentence_scores_to_google_spreadsheet(worksheet,
+                                                  positive_list=feedback_dataframe.loc[:, 'positive_list'],
+                                                  negative_list=feedback_dataframe.loc[:, 'negative_list'],
+                                                  neutral_list=feedback_dataframe.loc[:, 'neutral_list'])
