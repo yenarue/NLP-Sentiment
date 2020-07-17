@@ -152,3 +152,6 @@ fabric.properties
 
 # for google cloud api
 ds-nlp-sentiment-*.json
+
+# for google docs
+credentials.json
