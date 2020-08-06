@@ -155,3 +155,6 @@ ds-nlp-sentiment-*.json
 
 # for google docs
 credentials.json
+
+# for mac
+.DS_Store
