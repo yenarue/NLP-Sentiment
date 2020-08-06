@@ -217,13 +217,20 @@ def writeResultToHtml(feedback_dataframe):
     feedback_list = feedback_dataframe.loc[:, 'feedback'].to_list()
     email_list = feedback_dataframe.loc[:, 'email'].to_list()
 
+    f = open("새파일.html", 'w')
+
+    head = '총 피드백 개수 : ' + str(len(feedback_list))
+    f.write(head)
+
     tableHead = '<table border="1">  ' \
            '<tr>' \
+           '<th></th>' \
            '<th>Email</th>' \
+           '<th>점수</th>' \
+           '<th>피드백 길이</th>' \
            '<th>Feedback</th>' \
            '</tr>'
 
-    f = open("새파일.html", 'w')
     f.write(tableHead)
 
     for (index, feedback) in enumerate(feedback_list):
@@ -236,9 +243,20 @@ def writeResultToHtml(feedback_dataframe):
         feedback_dataframe.at[index + 1, 'sentence_count'] = len(doc_sentences)
         feedback_dataframe.at[index + 1, 'feedback_length'] = len(feedback)
 
+        print(feedback_dataframe.loc[index+1, :])
+
         data = '<tr>'
         data += '<td>'
+        data += str(index + 1)
+        data += '</td>'
+        data += '<td>'
         data += email_list[index]
+        data += '</td>'
+        data += '<td>'
+        data += str(feedback_dataframe.loc[index+1, 'score'])
+        data += '</td>'
+        data += '<td>'
+        data += str(feedback_dataframe.loc[index+1, 'feedback_length'])
         data += '</td>'
         data += '<td>'
         data += '<br>'.join(list(map(convertStyle, doc_sentences)))
@@ -247,7 +265,6 @@ def writeResultToHtml(feedback_dataframe):
         print(data)
         f.write(data)
 
-        # break
     f.write('</table>')
     f.close()
 
