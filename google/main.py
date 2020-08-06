@@ -122,10 +122,15 @@ def analyze_sentiment_each_sentence(feedback):
 
 def analyze_sentiment_context(feedback, is_verbose):
     # 통채로 연산 => 컨텍스트까지 고려됨
+    print("")
+    print("analyze_sentiment_context")
     print("한꺼번에 구했을 때의 총 점수 : ")
     score, magnitude, doc_sentences = analyze_sentiment(feedback)
     print(str(len(doc_sentences)) + "개의 문장")
     print("")
+
+    if len(doc_sentences) <= 0:
+        return
 
     if is_verbose:
         # 통채로 연산한 결과의 세부 내용 확인 (각 문장 분석)
@@ -163,37 +168,87 @@ feedback_dataframe = get_feedback_dataframe(worksheet,
                                             email_col_title='* 자동 입력된 이메일 정보입니다.')
 print(feedback_dataframe)
 
-feedback_list = feedback_dataframe.loc[:, 'feedback'].to_list()
-for (index, feedback) in enumerate(feedback_list):
-    score, magnitude, doc_sentences = analyze_sentiment_context(feedback, is_verbose=True)
-    print(score)
-    feedback_dataframe.at[index + 1, 'score'] = score
-    feedback_dataframe.at[index + 1, 'magnitude'] = magnitude
-    feedback_dataframe.at[index + 1, 'sentence_count'] = len(doc_sentences)
-    feedback_dataframe.at[index + 1, 'feedback_length'] = len(feedback)
+def writeResultToSpreadSheet(worksheet, feedback_dataframe):
+    feedback_list = feedback_dataframe.loc[:, 'feedback'].to_list()
 
-    negative_list = list(filter(lambda sen: sen.sentiment.score < 0, doc_sentences))
-    neutral_list = list(filter(lambda sen: sen.sentiment.score == 0, doc_sentences))
-    positive_list = list(filter(lambda sen: sen.sentiment.score > 0, doc_sentences))
+    for (index, feedback) in enumerate(feedback_list):
+        score, magnitude, doc_sentences = analyze_sentiment_context(feedback, is_verbose=True)
+        print(score)
+        feedback_dataframe.at[index + 1, 'score'] = score
+        feedback_dataframe.at[index + 1, 'magnitude'] = magnitude
+        feedback_dataframe.at[index + 1, 'sentence_count'] = len(doc_sentences)
+        feedback_dataframe.at[index + 1, 'feedback_length'] = len(feedback)
 
-    negative_list = list(map(lambda neg: str(neg.text.content), negative_list))
-    neutral_list = list(map(lambda neg: str(neg.text.content), neutral_list))
-    positive_list = list(map(lambda neg: str(neg.text.content), positive_list))
+        negative_list = list(filter(lambda sen: sen.sentiment.score < 0, doc_sentences))
+        neutral_list = list(filter(lambda sen: sen.sentiment.score == 0, doc_sentences))
+        positive_list = list(filter(lambda sen: sen.sentiment.score > 0, doc_sentences))
 
-    feedback_dataframe.at[index + 1, 'negative_list'] = "\n".join(negative_list) if len(negative_list) > 0 else "-"
-    feedback_dataframe.at[index + 1, 'neutral_list'] = "\n".join(neutral_list) if len(neutral_list) > 0 else "-"
-    feedback_dataframe.at[index + 1, 'positive_list'] = "\n".join(positive_list) if len(positive_list) > 0 else "-"
+        negative_list = list(map(lambda neg: str(neg.text.content), negative_list))
+        neutral_list = list(map(lambda neg: str(neg.text.content), neutral_list))
+        positive_list = list(map(lambda neg: str(neg.text.content), positive_list))
 
-    break
+        feedback_dataframe.at[index + 1, 'negative_list'] = "\n".join(negative_list) if len(negative_list) > 0 else "-"
+        feedback_dataframe.at[index + 1, 'neutral_list'] = "\n".join(neutral_list) if len(neutral_list) > 0 else "-"
+        feedback_dataframe.at[index + 1, 'positive_list'] = "\n".join(positive_list) if len(positive_list) > 0 else "-"
 
-print(feedback_dataframe)
+        break
 
-# 흠.. 이렇게하고보니 row가 더 나았을 수 있었겠다^^...
-update_score_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'score'])
-update_magnitude_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'magnitude'])
-update_sentence_count_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'sentence_count'])
-update_feedback_length_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'feedback_length'])
-update_each_sentence_scores_to_google_spreadsheet(worksheet,
-                                                  positive_list=feedback_dataframe.loc[:, 'positive_list'],
-                                                  negative_list=feedback_dataframe.loc[:, 'negative_list'],
-                                                  neutral_list=feedback_dataframe.loc[:, 'neutral_list'])
+    print(feedback_dataframe)
+
+    # 흠.. 이렇게하고보니 row가 더 나았을 수 있었겠다^^...
+    update_score_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'score'])
+    update_magnitude_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'magnitude'])
+    update_sentence_count_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'sentence_count'])
+    update_feedback_length_to_google_spreadsheet(worksheet, feedback_dataframe.loc[:, 'feedback_length'])
+    update_each_sentence_scores_to_google_spreadsheet(worksheet,
+                                                      positive_list=feedback_dataframe.loc[:, 'positive_list'],
+                                                      negative_list=feedback_dataframe.loc[:, 'negative_list'],
+                                                      neutral_list=feedback_dataframe.loc[:, 'neutral_list'])
+
+def convertStyle(sentence):
+    if sentence.sentiment.score > 0:
+        return '<span style="color: #00BFBA;"><b>' + sentence.text.content + '</b></span>'
+    elif sentence.sentiment.score < 0:
+        return '<span style="color: #FF8997;"><b>' + sentence.text.content + '</b></span>'
+    else:
+        return sentence.text.content
+
+def writeResultToHtml(feedback_dataframe):
+    feedback_list = feedback_dataframe.loc[:, 'feedback'].to_list()
+    email_list = feedback_dataframe.loc[:, 'email'].to_list()
+
+    tableHead = '<table border="1">  ' \
+           '<tr>' \
+           '<th>Email</th>' \
+           '<th>Feedback</th>' \
+           '</tr>'
+
+    f = open("새파일.html", 'w')
+    f.write(tableHead)
+
+    for (index, feedback) in enumerate(feedback_list):
+        if len(feedback) <= 0: continue
+
+        score, magnitude, doc_sentences = analyze_sentiment_context(feedback, is_verbose=True)
+        print(score)
+        feedback_dataframe.at[index + 1, 'score'] = score
+        feedback_dataframe.at[index + 1, 'magnitude'] = magnitude
+        feedback_dataframe.at[index + 1, 'sentence_count'] = len(doc_sentences)
+        feedback_dataframe.at[index + 1, 'feedback_length'] = len(feedback)
+
+        data = '<tr>'
+        data += '<td>'
+        data += email_list[index]
+        data += '</td>'
+        data += '<td>'
+        data += '<br>'.join(list(map(convertStyle, doc_sentences)))
+        data += '</td>'
+        data += '</tr>'
+        print(data)
+        f.write(data)
+
+        # break
+    f.write('</table>')
+    f.close()
+
+writeResultToHtml(feedback_dataframe)
